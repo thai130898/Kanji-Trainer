@@ -119,9 +119,25 @@
              <div class="text-6xl mb-4">🎉</div>
              <h2 class="text-3xl font-bold text-teal-600 mb-2">Set Complete!</h2>
              <p class="text-slate-600 mb-8">You have successfully mastered all items in this set. Great work!</p>
-             <button id="new-set-button" class="w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-teal-700 transition-colors duration-300 focus:outline-none focus-ring-teal-500">
-                Choose a New Set
-            </button>
+             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button id="new-set-button" class="w-full bg-slate-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-slate-700 transition-colors duration-300 focus:outline-none focus-ring-teal-500">
+                    Choose New Set
+                </button>
+                <button id="show-results-button" class="w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-teal-700 transition-colors duration-300 focus:outline-none focus-ring-teal-500">
+                    Show Results
+                </button>
+            </div>
+        </div>
+
+        <div id="results-screen" class="screen bg-white p-8 rounded-xl shadow-lg">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="results-title" class="text-2xl font-bold">Set Results</h2>
+                <button id="back-from-results-button" class="text-sm bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300 transition-colors duration-300">
+                    &larr; Back to Menu
+                </button>
+            </div>
+            <div id="results-grid" class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                </div>
         </div>
 
         <div id="browse-screen" class="screen">
@@ -170,6 +186,7 @@
         const completionScreen = document.getElementById('completion-screen');
         const browseScreen = document.getElementById('browse-screen');
         const statsScreen = document.getElementById('stats-screen');
+        const resultsScreen = document.getElementById('results-screen');
         
         const levelSelect = document.getElementById('level-select');
         const setSelect = document.getElementById('set-select');
@@ -187,10 +204,14 @@
         const kanjiCard = document.getElementById('kanji-card');
         const endSessionButton = document.getElementById('end-session-button');
         const newSetButton = document.getElementById('new-set-button');
+        const showResultsButton = document.getElementById('show-results-button');
 
         const browseGrid = document.getElementById('browse-grid');
         const browseTitle = document.getElementById('browse-title');
         const backToSelectionButton = document.getElementById('back-to-selection-button');
+
+        const resultsGrid = document.getElementById('results-grid');
+        const backFromResultsButton = document.getElementById('back-from-results-button');
         
         const statsContent = document.getElementById('stats-content');
         const backFromStatsButton = document.getElementById('back-from-stats-button');
@@ -201,14 +222,16 @@
         // --- Game & State ---
         let currentDeck = [];
         let incorrectPile = [];
+        let lastCompletedDeck = [];
         let currentItem = null;
         let totalInSet = 0;
         let currentMode = 'kanji'; // 'kanji' or 'vocab'
         let currentSetId = ''; // e.g., 'kanji-N5-1'
-        let userStats = {
+        let userStats = { // For lifetime stats
             completedSets: [],
             itemStats: {} // { 'item': { correct: 0, incorrect: 0 } }
         };
+        let sessionStats = {}; // For stats of the current session only
 
         // --- Functions ---
         
@@ -219,6 +242,7 @@
             screens.forEach(screen => {
                 screen.classList.toggle('active', screen.id === screenId);
             });
+            window.scrollTo(0, 0);
         }
 
         /**
@@ -258,7 +282,7 @@
             
             const levelOrder = ["N5", "N4", "N3", "N2", "N1"];
             levelOrder.forEach(level => {
-                 if (data[level]) {
+                 if (data[level] && data[level].length > 0) {
                     const option = document.createElement('option');
                     option.value = level;
                     option.textContent = level;
@@ -266,6 +290,7 @@
                  }
             });
             
+            levelSelect.removeEventListener('change', updateSetSelector);
             levelSelect.addEventListener('change', updateSetSelector);
             updateSetSelector();
         }
@@ -276,6 +301,8 @@
         function updateSetSelector() {
             setSelect.innerHTML = '';
             const selectedLevel = levelSelect.value;
+            if (!selectedLevel) return;
+
             const data = currentMode === 'kanji' ? fullKanjiData : vocabData;
             const levelData = data[selectedLevel] || [];
 
@@ -290,18 +317,24 @@
             };
 
             setSelect.parentElement.classList.toggle('hidden', levelData.length === 0);
+            if (levelData.length === 0) return;
+
             const setSize = currentMode === 'kanji' ? 50 : 200;
             const chunkedSets = chunkArray(levelData, setSize);
 
             const allLevelSetId = `${currentMode}-${selectedLevel}-all`;
-            const isAllCompleted = userStats.completedSets.includes(allLevelSetId);
-            const allLevelOption = createOption('all', `All ${selectedLevel} ${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)} (${levelData.length})`, isAllCompleted);
+            const isTheAllSetCompleted = userStats.completedSets.includes(allLevelSetId);
+
+            // Add "All" option
+            const allLevelOption = createOption('all', `All ${selectedLevel} ${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)} (${levelData.length})`, isTheAllSetCompleted);
             setSelect.appendChild(allLevelOption);
 
-            if (levelData.length > setSize) {
+            // Add smaller set options if applicable
+            if (chunkedSets.length > 1) {
                 chunkedSets.forEach((set, index) => {
                     const setId = `${currentMode}-${selectedLevel}-${index}`;
-                    const isCompleted = userStats.completedSets.includes(setId);
+                    // A small set is complete if it was completed by itself OR if the "All" set was completed.
+                    const isCompleted = userStats.completedSets.includes(setId) || isTheAllSetCompleted;
                     const startNum = index * setSize + 1;
                     const endNum = startNum + set.length - 1;
                     const option = createOption(index, `Set ${index + 1} (${startNum}-${endNum})`, isCompleted);
@@ -347,8 +380,8 @@
 
                 card.innerHTML = `
                     <div class="kanji-font ${itemClass} mb-2">${item.item}</div>
-                    <div class="font-semibold text-sm">${item.meaning[0]}</div>
-                    <div class="text-slate-500 text-xs">${item.reading[0]}</div>
+                    <div class="font-semibold text-sm">${item.meaning.join(', ')}</div>
+                    <div class="text-slate-500 text-xs">${item.reading.join(', ')}</div>
                 `;
                 browseGrid.appendChild(card);
             });
@@ -421,6 +454,43 @@
                  statsContent.innerHTML += '<p class="text-slate-500 mt-4">No troublesome items yet. Keep practicing!</p>';
             }
         }
+
+        /**
+         * Displays the results for the just-completed set using session data.
+         */
+        function displaySetResults() {
+            showScreen('results-screen');
+            resultsGrid.innerHTML = '';
+            
+            lastCompletedDeck.sort((a, b) => {
+                const statsA = sessionStats[a.item] || { incorrect: 0 };
+                const statsB = sessionStats[b.item] || { incorrect: 0 };
+                if (statsA.incorrect !== statsB.incorrect) {
+                    return statsB.incorrect - statsA.incorrect;
+                }
+                return a.item.localeCompare(b.item);
+            });
+
+            lastCompletedDeck.forEach(item => {
+                const stats = sessionStats[item.item] || { correct: 0, incorrect: 0 };
+                const performanceColor = stats.incorrect > 0 ? 'text-red-600' : 'text-green-600';
+                
+                const resultCard = `
+                    <div class="flex items-center justify-between bg-slate-50 p-3 rounded-lg">
+                        <div>
+                            <div class="kanji-font text-xl">${item.item}</div>
+                            <div class="text-sm text-slate-500">${item.meaning.join(' / ')}</div>
+                            <div class="text-xs text-slate-400">${item.reading.join(' / ')}</div>
+                        </div>
+                        <div class="text-sm text-right font-semibold whitespace-nowrap pl-4">
+                            <span class="text-green-600">${stats.correct} Correct</span> / 
+                            <span class="${performanceColor}">${stats.incorrect} Incorrect</span>
+                        </div>
+                    </div>
+                `;
+                resultsGrid.innerHTML += resultCard;
+            });
+        }
         
         /**
          * Resets all user statistics.
@@ -434,7 +504,6 @@
             }
         }
 
-
         /**
          * Starts a game session.
          */
@@ -445,6 +514,8 @@
                 return;
             }
             
+            sessionStats = {}; // Reset session stats for the new game
+            lastCompletedDeck = JSON.parse(JSON.stringify(deckToLoad));
             currentDeck = JSON.parse(JSON.stringify(deckToLoad));
             incorrectPile = [];
             totalInSet = currentDeck.length;
@@ -460,7 +531,7 @@
 
         function displayNextItem() {
             updateProgress();
-            feedbackMessage.textContent = '';
+            feedbackMessage.innerHTML = '';
             kanjiCard.classList.remove('shake');
 
             if (currentDeck.length === 0) {
@@ -499,9 +570,9 @@
         }
 
         /**
-         * Updates the stats for a given item.
+         * Updates the LIFETIME stats for a given item.
          */
-        function updateStats(item, isCorrect) {
+        function updateLifetimeStats(item, isCorrect) {
             const key = item.item;
             if (!userStats.itemStats[key]) {
                 userStats.itemStats[key] = { correct: 0, incorrect: 0 };
@@ -512,26 +583,47 @@
                 userStats.itemStats[key].incorrect++;
             }
         }
+
+        /**
+         * Updates the CURRENT SESSION stats for a given item.
+         */
+        function updateSessionStats(item, isCorrect) {
+            const key = item.item;
+            if (!sessionStats[key]) {
+                sessionStats[key] = { correct: 0, incorrect: 0 };
+            }
+            if (isCorrect) {
+                sessionStats[key].correct++;
+            } else {
+                sessionStats[key].incorrect++;
+            }
+        }
         
         function handleCorrectAnswer() {
-            updateStats(currentItem, true);
-            currentDeck.shift();
-            feedbackMessage.textContent = 'Correct!';
+            updateLifetimeStats(currentItem, true);
+            updateSessionStats(currentItem, true);
+            const answeredItem = currentDeck.shift();
+            
+            const allMeanings = answeredItem.meaning.join(' / ');
+            const allReadings = answeredItem.reading.join(' / ');
+            
+            feedbackMessage.innerHTML = `Correct! Answers: <strong class="ml-1">${allMeanings} / ${allReadings}</strong>`;
             feedbackMessage.classList.remove('text-red-500');
             feedbackMessage.classList.add('text-green-500');
             
             answerInput.value = '';
             
-            setTimeout(displayNextItem, 500);
+            setTimeout(displayNextItem, 1200);
         }
         
         function handleIncorrectAnswer() {
-            updateStats(currentItem, false);
+            updateLifetimeStats(currentItem, false);
+            updateSessionStats(currentItem, false);
             const wrongItem = currentDeck.shift();
             incorrectPile.push(wrongItem);
             
-            const primaryMeaning = currentItem.meaning[0];
-            const primaryReading = currentItem.reading[0];
+            const primaryMeaning = currentItem.meaning.join(' / ');
+            const primaryReading = currentItem.reading.join(' / ');
             feedbackMessage.innerHTML = `Incorrect. Answers: <strong class="ml-1">${primaryMeaning} / ${primaryReading}</strong>`;
             feedbackMessage.classList.remove('text-green-500');
             feedbackMessage.classList.add('text-red-500');
@@ -557,7 +649,7 @@
 
         function resetToSelection() {
             showScreen('selection-screen');
-            updateSetSelector(); // Refresh to show completion status
+            populateSelectors(); // Refresh to show completion status
         }
 
         function shuffleArray(array) {
@@ -582,7 +674,8 @@
 
         // --- Go to Top Button Logic ---
         window.onscroll = function() {
-            if (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) {
+            const isScrollable = document.documentElement.scrollHeight > document.documentElement.clientHeight;
+            if (isScrollable && (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100)) {
                 goToTopBtn.classList.remove('hidden');
             } else {
                 goToTopBtn.classList.add('hidden');
@@ -600,15 +693,16 @@
         statsButton.addEventListener('click', displayStats);
         endSessionButton.addEventListener('click', resetToSelection);
         newSetButton.addEventListener('click', resetToSelection);
+        showResultsButton.addEventListener('click', displaySetResults);
         backToSelectionButton.addEventListener('click', resetToSelection);
         backFromStatsButton.addEventListener('click', () => showScreen('selection-screen'));
+        backFromResultsButton.addEventListener('click', resetToSelection);
         resetStatsButton.addEventListener('click', resetStats);
         modeToggle.addEventListener('change', handleModeChange);
 
         answerInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
-                // Allow submitting answer if feedback isn't currently shown
-                if (feedbackMessage.textContent === '') {
+                if (feedbackMessage.innerHTML === '') {
                     checkAnswer();
                 }
             }
