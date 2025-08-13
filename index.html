@@ -9,17 +9,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
     
-    <!-- 
-      NOTE: For this to work, you need a 'data' folder with these files.
-    -->
-    <!-- Kanji Data Files -->
     <script src="data/kanji-n5.js"></script>
     <script src="data/kanji-n4.js"></script>
     <script src="data/kanji-n3.js"></script>
     <script src="data/kanji-n2.js"></script>
     <script src="data/kanji-n1.js"></script>
 
-    <!-- Vocabulary Data Files -->
     <script src="data/vocab-n5.js"></script>
     <script src="data/vocab-n4.js"></script>
     <script src="data/vocab-n3.js"></script>
@@ -59,7 +54,6 @@
 
     <div id="app-container" class="w-full max-w-2xl mx-auto p-4">
 
-        <!-- Selection Screen -->
         <div id="selection-screen" class="screen active bg-white p-8 rounded-xl shadow-lg">
             <h1 class="text-2xl font-bold text-center mb-2">Kanji & Vocab Trainer</h1>
             <p class="text-center text-slate-500 mb-6">Select a mode and level to begin.</p>
@@ -101,7 +95,6 @@
             </div>
         </div>
 
-        <!-- Game Screen -->
         <div id="game-screen" class="screen">
             <div class="max-w-md mx-auto">
                 <div class="flex justify-between items-center mb-4">
@@ -122,7 +115,6 @@
             </div>
         </div>
         
-        <!-- Completion Screen -->
         <div id="completion-screen" class="screen text-center bg-white p-8 rounded-xl shadow-lg max-w-md mx-auto">
              <div class="text-6xl mb-4">🎉</div>
              <h2 class="text-3xl font-bold text-teal-600 mb-2">Set Complete!</h2>
@@ -132,7 +124,6 @@
             </button>
         </div>
 
-        <!-- Browse Screen -->
         <div id="browse-screen" class="screen">
             <div class="flex justify-between items-center mb-6">
                 <h2 id="browse-title" class="text-xl font-bold"></h2>
@@ -141,11 +132,9 @@
                 </button>
             </div>
             <div id="browse-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                <!-- Cards will be populated by JS -->
-            </div>
+                </div>
         </div>
 
-        <!-- Stats Screen -->
         <div id="stats-screen" class="screen bg-white p-8 rounded-xl shadow-lg">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold">My Stats</h2>
@@ -154,8 +143,7 @@
                 </button>
             </div>
             <div id="stats-content" class="space-y-6">
-                <!-- Stats will be populated by JS -->
-            </div>
+                </div>
             <div class="mt-8 text-center">
                 <button id="reset-stats-button" class="text-sm text-red-500 hover:text-red-700 font-semibold">Reset All Stats</button>
             </div>
@@ -163,7 +151,6 @@
 
     </div>
     
-    <!-- Go to Top Button -->
     <button id="go-to-top-btn" class="hidden fixed bottom-5 right-5 bg-teal-600 text-white w-12 h-12 rounded-full shadow-lg hover:bg-teal-700 transition-colors duration-300 focus:outline-none focus-ring-teal-500 flex items-center justify-center">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
@@ -302,32 +289,25 @@
                 return option;
             };
 
-            if (currentMode === 'vocab') {
-                const setId = `vocab-${selectedLevel}-all`;
-                const isCompleted = userStats.completedSets.includes(setId);
-                const allOption = createOption('all', `All ${selectedLevel} Vocab (${levelData.length})`, isCompleted);
-                setSelect.appendChild(allOption);
-                setSelect.parentElement.classList.toggle('hidden', levelData.length === 0);
-                return;
-            }
-            
-            setSelect.parentElement.classList.remove('hidden');
-            const allKanjiInLevel = levelData;
-            const chunkedSets = chunkArray(allKanjiInLevel, 50);
+            setSelect.parentElement.classList.toggle('hidden', levelData.length === 0);
+            const setSize = currentMode === 'kanji' ? 50 : 200;
+            const chunkedSets = chunkArray(levelData, setSize);
 
-            const allLevelSetId = `kanji-${selectedLevel}-all`;
+            const allLevelSetId = `${currentMode}-${selectedLevel}-all`;
             const isAllCompleted = userStats.completedSets.includes(allLevelSetId);
-            const allLevelOption = createOption('all', `All ${selectedLevel} Kanji (${allKanjiInLevel.length})`, isAllCompleted);
+            const allLevelOption = createOption('all', `All ${selectedLevel} ${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)} (${levelData.length})`, isAllCompleted);
             setSelect.appendChild(allLevelOption);
 
-            chunkedSets.forEach((set, index) => {
-                const setId = `kanji-${selectedLevel}-${index}`;
-                const isCompleted = userStats.completedSets.includes(setId);
-                const startNum = index * 50 + 1;
-                const endNum = startNum + set.length - 1;
-                const option = createOption(index, `Set ${index + 1} (${startNum}-${endNum})`, isCompleted);
-                setSelect.appendChild(option);
-            });
+            if (levelData.length > setSize) {
+                chunkedSets.forEach((set, index) => {
+                    const setId = `${currentMode}-${selectedLevel}-${index}`;
+                    const isCompleted = userStats.completedSets.includes(setId);
+                    const startNum = index * setSize + 1;
+                    const endNum = startNum + set.length - 1;
+                    const option = createOption(index, `Set ${index + 1} (${startNum}-${endNum})`, isCompleted);
+                    setSelect.appendChild(option);
+                });
+            }
         }
 
         /**
@@ -341,11 +321,12 @@
 
             currentSetId = `${currentMode}-${selectedLevel}-${selectedSetIndex}`;
 
-            if (currentMode === 'vocab' || selectedSetIndex === 'all') {
+            if (selectedSetIndex === 'all') {
                 return levelData;
             }
 
-            const chunkedSets = chunkArray(levelData, 50);
+            const setSize = currentMode === 'kanji' ? 50 : 200;
+            const chunkedSets = chunkArray(levelData, setSize);
             return chunkedSets[parseInt(selectedSetIndex)] || [];
         }
 
