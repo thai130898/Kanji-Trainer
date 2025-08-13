@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanji & Vocab Trainer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- 
+      NOTE: For this to work, you need a 'data' folder with these files.
+    -->
+    <!-- Kanji Data Files -->
+    <script src="data/kanji-n5.js"></script>
+    <script src="data/kanji-n4.js"></script>
+    <script src="data/kanji-n3.js"></script>
+    <script src="data/kanji-n2.js"></script>
+    <script src="data/kanji-n1.js"></script>
+
+    <!-- Vocabulary Data Files -->
+    <script src="data/vocab-n5.js"></script>
+    <script src="data/vocab-n4.js"></script>
+    <script src="data/vocab-n3.js"></script>
+    <script src="data/vocab-n2.js"></script>
+    <script src="data/vocab-n1.js"></script>
+
+    <style>
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Inter', sans-serif; touch-action: manipulation; }
+        .kanji-font { font-family: 'Noto Sans JP', sans-serif; }
+        .focus-ring-teal-500:focus {
+            --tw-ring-opacity: 1;
+            --tw-ring-color: rgb(20 184 166 / var(--tw-ring-opacity));
+            box-shadow: 0 0 0 3px rgb(20 184 166 / 0.5);
+        }
+        #feedback-message { transition: all 0.3s ease-in-out; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .shake { animation: shake 0.5s ease-in-out; }
+        .toggle-bg:after {
+            content: ''; position: absolute; top: 2px; left: 2px;
+            background-color: white; width: 20px; height: 20px;
+            border-radius: 9999px; transition: transform 0.2s ease-in-out;
+        }
+        input:checked + .toggle-bg:after { transform: translateX(100%); }
+        input:checked + .toggle-bg { background-color: #14b8a6; } /* teal-500 */
+        .screen { display: none; }
+        .screen.active { display: block; }
+        .progress-bar-bg { background-color: #e0e0e0; border-radius: 10px; overflow: hidden; }
+        .progress-bar { background-color: #14b8a6; height: 100%; text-align: center; color: white; line-height: 20px; transition: width 0.5s ease; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div id="app-container" class="w-full max-w-2xl mx-auto p-4">
+
+        <!-- Selection Screen -->
+        <div id="selection-screen" class="screen active bg-white p-8 rounded-xl shadow-lg">
+            <h1 class="text-2xl font-bold text-center mb-2">Kanji & Vocab Trainer</h1>
+            <p class="text-center text-slate-500 mb-6">Select a mode and level to begin.</p>
+            
+             <div class="flex items-center justify-center space-x-4 mb-6">
+                <span id="kanji-label" class="font-semibold text-teal-600">Kanji</span>
+                <label for="mode-toggle" class="flex items-center cursor-pointer">
+                    <div class="relative">
+                        <input type="checkbox" id="mode-toggle" class="sr-only">
+                        <div class="toggle-bg block bg-slate-300 w-11 h-6 rounded-full"></div>
+                    </div>
+                </label>
+                <span id="vocab-label" class="font-semibold text-slate-400">Vocabulary</span>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label for="level-select" class="block text-sm font-medium text-slate-700 mb-1">JLPT Level</label>
+                    <select id="level-select" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg focus-ring-teal-500 focus:outline-none"></select>
+                </div>
+                 <div>
+                    <label for="set-select" class="block text-sm font-medium text-slate-700 mb-1">Set</label>
+                    <select id="set-select" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg focus-ring-teal-500 focus:outline-none"></select>
+                </div>
+            </div>
+
+            <div class="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                 <button id="browse-button" class="w-full bg-slate-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-slate-700 transition-colors duration-300 focus:outline-none focus-ring-teal-500">
+                    Browse Set
+                </button>
+                <button id="start-button" class="w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-teal-700 transition-colors duration-300 focus:outline-none focus-ring-teal-500">
+                    Start Learning
+                </button>
+            </div>
+            <div class="mt-4 text-center">
+                 <button id="stats-button" class="w-full sm:w-auto bg-white text-teal-600 font-bold py-3 px-5 rounded-lg hover:bg-teal-50 transition-colors duration-300 focus:outline-none focus-ring-teal-500 border-2 border-teal-600">
+                    View My Stats
+                </button>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen" class="screen">
+            <div class="max-w-md mx-auto">
+                <div class="flex justify-between items-center mb-4">
+                     <div id="progress-counter" class="text-sm font-semibold bg-white px-3 py-1 rounded-lg shadow">0 / 0</div>
+                     <button id="end-session-button" class="text-sm text-slate-500 hover:text-red-600 font-semibold">End Session</button>
+                </div>
+
+                <div id="kanji-card" class="bg-white rounded-xl shadow-lg p-8 flex flex-col items-center justify-center min-h-[200px] mb-6">
+                    <div id="item-display" class="kanji-font text-center break-words"></div>
+                </div>
+
+                <div id="feedback-message" class="text-center h-8 mb-4 font-semibold"></div>
+
+                <div class="relative">
+                    <input type="text" id="answer-input" placeholder="Type meaning or romaji..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="w-full p-4 text-center text-lg border-2 border-slate-300 rounded-lg focus:outline-none focus-ring-teal-500">
+                </div>
+                 <p class="text-center text-slate-400 text-xs mt-2">Press Enter to submit</p>
+            </div>
+        </div>
+        
+        <!-- Completion Screen -->
+        <div id="completion-screen" class="screen text-center bg-white p-8 rounded-xl shadow-lg max-w-md mx-auto">
+             <div class="text-6xl mb-4">🎉</div>
+             <h2 class="text-3xl font-bold text-teal-600 mb-2">Set Complete!</h2>
+             <p class="text-slate-600 mb-8">You have successfully mastered all items in this set. Great work!</p>
+             <button id="new-set-button" class="w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-teal-700 transition-colors duration-300 focus:outline-none focus-ring-teal-500">
+                Choose a New Set
+            </button>
+        </div>
+
+        <!-- Browse Screen -->
+        <div id="browse-screen" class="screen">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="browse-title" class="text-xl font-bold"></h2>
+                <button id="back-to-selection-button" class="text-sm bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300 transition-colors duration-300">
+                    &larr; Back
+                </button>
+            </div>
+            <div id="browse-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <!-- Cards will be populated by JS -->
+            </div>
+        </div>
+
+        <!-- Stats Screen -->
+        <div id="stats-screen" class="screen bg-white p-8 rounded-xl shadow-lg">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">My Stats</h2>
+                <button id="back-from-stats-button" class="text-sm bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300 transition-colors duration-300">
+                    &larr; Back
+                </button>
+            </div>
+            <div id="stats-content" class="space-y-6">
+                <!-- Stats will be populated by JS -->
+            </div>
+            <div class="mt-8 text-center">
+                <button id="reset-stats-button" class="text-sm text-red-500 hover:text-red-700 font-semibold">Reset All Stats</button>
+            </div>
+        </div>
+
+    </div>
+    
+    <!-- Go to Top Button -->
+    <button id="go-to-top-btn" class="hidden fixed bottom-5 right-5 bg-teal-600 text-white w-12 h-12 rounded-full shadow-lg hover:bg-teal-700 transition-colors duration-300 focus:outline-none focus-ring-teal-500 flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+        </svg>
+    </button>
+
+
+    <script>
+        // --- DATA OBJECTS ---
+        const fullKanjiData = {};
+        const vocabData = {};
+
+        // --- DOM Elements ---
+        const screens = document.querySelectorAll('.screen');
+        const selectionScreen = document.getElementById('selection-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const completionScreen = document.getElementById('completion-screen');
+        const browseScreen = document.getElementById('browse-screen');
+        const statsScreen = document.getElementById('stats-screen');
+        
+        const levelSelect = document.getElementById('level-select');
+        const setSelect = document.getElementById('set-select');
+        const startButton = document.getElementById('start-button');
+        const browseButton = document.getElementById('browse-button');
+        const statsButton = document.getElementById('stats-button');
+        const modeToggle = document.getElementById('mode-toggle');
+        const kanjiLabel = document.getElementById('kanji-label');
+        const vocabLabel = document.getElementById('vocab-label');
+        
+        const itemDisplay = document.getElementById('item-display');
+        const answerInput = document.getElementById('answer-input');
+        const feedbackMessage = document.getElementById('feedback-message');
+        const progressCounter = document.getElementById('progress-counter');
+        const kanjiCard = document.getElementById('kanji-card');
+        const endSessionButton = document.getElementById('end-session-button');
+        const newSetButton = document.getElementById('new-set-button');
+
+        const browseGrid = document.getElementById('browse-grid');
+        const browseTitle = document.getElementById('browse-title');
+        const backToSelectionButton = document.getElementById('back-to-selection-button');
+        
+        const statsContent = document.getElementById('stats-content');
+        const backFromStatsButton = document.getElementById('back-from-stats-button');
+        const resetStatsButton = document.getElementById('reset-stats-button');
+
+        const goToTopBtn = document.getElementById('go-to-top-btn');
+
+        // --- Game & State ---
+        let currentDeck = [];
+        let incorrectPile = [];
+        let currentItem = null;
+        let totalInSet = 0;
+        let currentMode = 'kanji'; // 'kanji' or 'vocab'
+        let currentSetId = ''; // e.g., 'kanji-N5-1'
+        let userStats = {
+            completedSets: [],
+            itemStats: {} // { 'item': { correct: 0, incorrect: 0 } }
+        };
+
+        // --- Functions ---
+        
+        /**
+         * Switches the visible screen
+         */
+        function showScreen(screenId) {
+            screens.forEach(screen => {
+                screen.classList.toggle('active', screen.id === screenId);
+            });
+        }
+
+        /**
+         * Load user progress and stats from localStorage
+         */
+        function loadData() {
+            const savedStats = localStorage.getItem('jpTrainerStats');
+            if (savedStats) {
+                userStats = JSON.parse(savedStats);
+            }
+        }
+
+        /**
+         * Save user progress and stats to localStorage
+         */
+        function saveData() {
+            localStorage.setItem('jpTrainerStats', JSON.stringify(userStats));
+        }
+
+        /**
+         * Chunks an array into smaller arrays of a specified size.
+         */
+        function chunkArray(array, size) {
+            const chunkedArr = [];
+            for (let i = 0; i < array.length; i += size) {
+                chunkedArr.push(array.slice(i, i + size));
+            }
+            return chunkedArr;
+        }
+
+        /**
+         * Populates the level and set selectors based on the current mode.
+         */
+        function populateSelectors() {
+            levelSelect.innerHTML = '';
+            const data = currentMode === 'kanji' ? fullKanjiData : vocabData;
+            
+            const levelOrder = ["N5", "N4", "N3", "N2", "N1"];
+            levelOrder.forEach(level => {
+                 if (data[level]) {
+                    const option = document.createElement('option');
+                    option.value = level;
+                    option.textContent = level;
+                    levelSelect.appendChild(option);
+                 }
+            });
+            
+            levelSelect.addEventListener('change', updateSetSelector);
+            updateSetSelector();
+        }
+
+        /**
+         * Updates the set selector based on the selected level and mode.
+         */
+        function updateSetSelector() {
+            setSelect.innerHTML = '';
+            const selectedLevel = levelSelect.value;
+            const data = currentMode === 'kanji' ? fullKanjiData : vocabData;
+            const levelData = data[selectedLevel] || [];
+
+            const createOption = (value, text, isCompleted) => {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = text + (isCompleted ? ' ✓' : '');
+                if (isCompleted) {
+                    option.classList.add('text-green-600', 'font-bold');
+                }
+                return option;
+            };
+
+            if (currentMode === 'vocab') {
+                const setId = `vocab-${selectedLevel}-all`;
+                const isCompleted = userStats.completedSets.includes(setId);
+                const allOption = createOption('all', `All ${selectedLevel} Vocab (${levelData.length})`, isCompleted);
+                setSelect.appendChild(allOption);
+                setSelect.parentElement.classList.toggle('hidden', levelData.length === 0);
+                return;
+            }
+            
+            setSelect.parentElement.classList.remove('hidden');
+            const allKanjiInLevel = levelData;
+            const chunkedSets = chunkArray(allKanjiInLevel, 50);
+
+            const allLevelSetId = `kanji-${selectedLevel}-all`;
+            const isAllCompleted = userStats.completedSets.includes(allLevelSetId);
+            const allLevelOption = createOption('all', `All ${selectedLevel} Kanji (${allKanjiInLevel.length})`, isAllCompleted);
+            setSelect.appendChild(allLevelOption);
+
+            chunkedSets.forEach((set, index) => {
+                const setId = `kanji-${selectedLevel}-${index}`;
+                const isCompleted = userStats.completedSets.includes(setId);
+                const startNum = index * 50 + 1;
+                const endNum = startNum + set.length - 1;
+                const option = createOption(index, `Set ${index + 1} (${startNum}-${endNum})`, isCompleted);
+                setSelect.appendChild(option);
+            });
+        }
+
+        /**
+         * Retrieves the currently selected deck and sets the currentSetId.
+         */
+        function getSelectedDeck() {
+            const selectedLevel = levelSelect.value;
+            const selectedSetIndex = setSelect.value;
+            const data = currentMode === 'kanji' ? fullKanjiData : vocabData;
+            const levelData = data[selectedLevel] || [];
+
+            currentSetId = `${currentMode}-${selectedLevel}-${selectedSetIndex}`;
+
+            if (currentMode === 'vocab' || selectedSetIndex === 'all') {
+                return levelData;
+            }
+
+            const chunkedSets = chunkArray(levelData, 50);
+            return chunkedSets[parseInt(selectedSetIndex)] || [];
+        }
+
+        /**
+         * Displays the browse screen with the selected set.
+         */
+        function showBrowseScreen() {
+            showScreen('browse-screen');
+            const deck = getSelectedDeck();
+            browseGrid.innerHTML = '';
+            browseTitle.textContent = setSelect.options[setSelect.selectedIndex].text.replace(' ✓', '');
+
+            deck.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-4 rounded-lg shadow flex flex-col items-center justify-center text-center';
+                const isKanji = item.item.length === 1;
+                const itemClass = isKanji ? 'text-4xl' : 'text-2xl';
+
+                card.innerHTML = `
+                    <div class="kanji-font ${itemClass} mb-2">${item.item}</div>
+                    <div class="font-semibold text-sm">${item.meaning[0]}</div>
+                    <div class="text-slate-500 text-xs">${item.reading[0]}</div>
+                `;
+                browseGrid.appendChild(card);
+            });
+        }
+        
+        /**
+         * Displays the stats screen.
+         */
+        function displayStats() {
+            showScreen('stats-screen');
+            statsContent.innerHTML = '';
+
+            let totalCorrect = 0;
+            let totalIncorrect = 0;
+
+            Object.values(userStats.itemStats).forEach(stat => {
+                totalCorrect += stat.correct;
+                totalIncorrect += stat.incorrect;
+            });
+
+            const totalAttempts = totalCorrect + totalIncorrect;
+            const accuracy = totalAttempts > 0 ? ((totalCorrect / totalAttempts) * 100).toFixed(1) : 0;
+
+            const overallStatsHTML = `
+                <div>
+                    <h3 class="text-lg font-bold mb-2">Overall Performance</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                        <div class="bg-slate-100 p-4 rounded-lg">
+                            <div class="text-2xl font-bold">${userStats.completedSets.length}</div>
+                            <div class="text-sm text-slate-600">Sets Completed</div>
+                        </div>
+                        <div class="bg-slate-100 p-4 rounded-lg">
+                            <div class="text-2xl font-bold">${totalCorrect}</div>
+                            <div class="text-sm text-slate-600">Correct Answers</div>
+                        </div>
+                        <div class="bg-slate-100 p-4 rounded-lg">
+                            <div class="text-2xl font-bold">${totalIncorrect}</div>
+                            <div class="text-sm text-slate-600">Incorrect Answers</div>
+                        </div>
+                        <div class="bg-slate-100 p-4 rounded-lg">
+                            <div class="text-2xl font-bold">${accuracy}%</div>
+                            <div class="text-sm text-slate-600">Accuracy</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            statsContent.innerHTML += overallStatsHTML;
+
+            const troublesomeItems = Object.entries(userStats.itemStats)
+                .filter(([_, stats]) => stats.incorrect > 0)
+                .sort(([, a], [, b]) => b.incorrect - a.incorrect || a.correct - b.correct)
+                .slice(0, 10);
+
+            if (troublesomeItems.length > 0) {
+                let troublesomeHTML = '<h3 class="text-lg font-bold mb-2 mt-6">Top 10 Troublesome Items</h3><div class="space-y-2">';
+                troublesomeItems.forEach(([item, stats]) => {
+                    troublesomeHTML += `
+                        <div class="flex items-center justify-between bg-slate-50 p-3 rounded-lg">
+                            <div class="kanji-font text-xl">${item}</div>
+                            <div class="text-sm">
+                                <span class="font-semibold text-green-600">${stats.correct} correct</span>, 
+                                <span class="font-semibold text-red-600">${stats.incorrect} incorrect</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                troublesomeHTML += '</div>';
+                statsContent.innerHTML += troublesomeHTML;
+            } else {
+                 statsContent.innerHTML += '<p class="text-slate-500 mt-4">No troublesome items yet. Keep practicing!</p>';
+            }
+        }
+        
+        /**
+         * Resets all user statistics.
+         */
+        function resetStats() {
+            if (confirm("Are you sure you want to reset all your stats? This action cannot be undone.")) {
+                userStats = { completedSets: [], itemStats: {} };
+                saveData();
+                displayStats(); // Refresh the view
+                populateSelectors(); // Refresh selectors to remove completion marks
+            }
+        }
+
+
+        /**
+         * Starts a game session.
+         */
+        function startGame() {
+            const deckToLoad = getSelectedDeck();
+            if (deckToLoad.length === 0) {
+                alert("This set is empty. Please select another one.");
+                return;
+            }
+            
+            currentDeck = JSON.parse(JSON.stringify(deckToLoad));
+            incorrectPile = [];
+            totalInSet = currentDeck.length;
+
+            shuffleArray(currentDeck);
+            showScreen('game-screen');
+            
+            answerInput.value = '';
+            answerInput.focus();
+            
+            displayNextItem();
+        }
+
+        function displayNextItem() {
+            updateProgress();
+            feedbackMessage.textContent = '';
+            kanjiCard.classList.remove('shake');
+
+            if (currentDeck.length === 0) {
+                if (incorrectPile.length > 0) {
+                    currentDeck = incorrectPile;
+                    incorrectPile = [];
+                    shuffleArray(currentDeck);
+                } else {
+                    showCompletionScreen();
+                    return;
+                }
+            }
+
+            currentItem = currentDeck[0];
+            itemDisplay.textContent = currentItem.item;
+            
+            const len = currentItem.item.length;
+            itemDisplay.className = 'kanji-font text-center break-words'; // Reset classes
+            if (len > 5) itemDisplay.classList.add('text-4xl', 'md:text-5xl');
+            else if (len > 2) itemDisplay.classList.add('text-5xl', 'md:text-6xl');
+            else itemDisplay.classList.add('text-8xl', 'md:text-9xl');
+        }
+
+        function checkAnswer() {
+            const userAnswer = answerInput.value.trim().toLowerCase();
+            if (!userAnswer || !currentItem) return;
+
+            const isMeaningCorrect = currentItem.meaning.some(m => m.toLowerCase() === userAnswer);
+            const isReadingCorrect = currentItem.reading.some(r => r.toLowerCase() === userAnswer);
+
+            if (isMeaningCorrect || isReadingCorrect) {
+                handleCorrectAnswer();
+            } else {
+                handleIncorrectAnswer();
+            }
+        }
+
+        /**
+         * Updates the stats for a given item.
+         */
+        function updateStats(item, isCorrect) {
+            const key = item.item;
+            if (!userStats.itemStats[key]) {
+                userStats.itemStats[key] = { correct: 0, incorrect: 0 };
+            }
+            if (isCorrect) {
+                userStats.itemStats[key].correct++;
+            } else {
+                userStats.itemStats[key].incorrect++;
+            }
+        }
+        
+        function handleCorrectAnswer() {
+            updateStats(currentItem, true);
+            currentDeck.shift();
+            feedbackMessage.textContent = 'Correct!';
+            feedbackMessage.classList.remove('text-red-500');
+            feedbackMessage.classList.add('text-green-500');
+            
+            answerInput.value = '';
+            
+            setTimeout(displayNextItem, 500);
+        }
+        
+        function handleIncorrectAnswer() {
+            updateStats(currentItem, false);
+            const wrongItem = currentDeck.shift();
+            incorrectPile.push(wrongItem);
+            
+            const primaryMeaning = currentItem.meaning[0];
+            const primaryReading = currentItem.reading[0];
+            feedbackMessage.innerHTML = `Incorrect. Answers: <strong class="ml-1">${primaryMeaning} / ${primaryReading}</strong>`;
+            feedbackMessage.classList.remove('text-green-500');
+            feedbackMessage.classList.add('text-red-500');
+            kanjiCard.classList.add('shake');
+            
+            answerInput.value = '';
+            
+            setTimeout(displayNextItem, 2500);
+        }
+
+        function updateProgress() {
+            const correctCount = totalInSet - (currentDeck.length + incorrectPile.length);
+            progressCounter.textContent = `${correctCount} / ${totalInSet}`;
+        }
+        
+        function showCompletionScreen() {
+            if (!userStats.completedSets.includes(currentSetId)) {
+                userStats.completedSets.push(currentSetId);
+            }
+            saveData();
+            showScreen('completion-screen');
+        }
+
+        function resetToSelection() {
+            showScreen('selection-screen');
+            updateSetSelector(); // Refresh to show completion status
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+        
+        function handleModeChange() {
+            if (modeToggle.checked) {
+                currentMode = 'vocab';
+                vocabLabel.classList.replace('text-slate-400', 'text-teal-600');
+                kanjiLabel.classList.replace('text-teal-600', 'text-slate-400');
+            } else {
+                currentMode = 'kanji';
+                kanjiLabel.classList.replace('text-slate-400', 'text-teal-600');
+                vocabLabel.classList.replace('text-teal-600', 'text-slate-400');
+            }
+            populateSelectors();
+        }
+
+        // --- Go to Top Button Logic ---
+        window.onscroll = function() {
+            if (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) {
+                goToTopBtn.classList.remove('hidden');
+            } else {
+                goToTopBtn.classList.add('hidden');
+            }
+        };
+
+        goToTopBtn.addEventListener('click', () => {
+             window.scrollTo({top: 0, behavior: 'smooth'});
+        });
+
+
+        // --- Event Listeners ---
+        startButton.addEventListener('click', startGame);
+        browseButton.addEventListener('click', showBrowseScreen);
+        statsButton.addEventListener('click', displayStats);
+        endSessionButton.addEventListener('click', resetToSelection);
+        newSetButton.addEventListener('click', resetToSelection);
+        backToSelectionButton.addEventListener('click', resetToSelection);
+        backFromStatsButton.addEventListener('click', () => showScreen('selection-screen'));
+        resetStatsButton.addEventListener('click', resetStats);
+        modeToggle.addEventListener('change', handleModeChange);
+
+        answerInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                // Allow submitting answer if feedback isn't currently shown
+                if (feedbackMessage.textContent === '') {
+                    checkAnswer();
+                }
+            }
+        });
+        
+        // --- Initial Setup ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Combine data from external files into the main data objects
+            if (typeof kanjiN5Data !== 'undefined') fullKanjiData.N5 = kanjiN5Data;
+            if (typeof kanjiN4Data !== 'undefined') fullKanjiData.N4 = kanjiN4Data;
+            if (typeof kanjiN3Data !== 'undefined') fullKanjiData.N3 = kanjiN3Data;
+            if (typeof kanjiN2Data !== 'undefined') fullKanjiData.N2 = kanjiN2Data;
+            if (typeof kanjiN1Data !== 'undefined') fullKanjiData.N1 = kanjiN1Data;
+            
+            if (typeof vocabN5Data !== 'undefined') vocabData.N5 = vocabN5Data;
+            if (typeof vocabN4Data !== 'undefined') vocabData.N4 = vocabN4Data;
+            if (typeof vocabN3Data !== 'undefined') vocabData.N3 = vocabN3Data;
+            if (typeof vocabN2Data !== 'undefined') vocabData.N2 = vocabN2Data;
+            if (typeof vocabN1Data !== 'undefined') vocabData.N1 = vocabN1Data;
+            
+            loadData();
+            populateSelectors();
+            showScreen('selection-screen');
+        });
+
+    </script>
+</body>
+</html>
