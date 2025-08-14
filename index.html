@@ -130,7 +130,7 @@
         </div>
 
         <div id="results-screen" class="screen bg-white p-8 rounded-xl shadow-lg">
-            <div class="flex justify-between items-center mb-6">
+            <div class="flex justify-between items-center mb-4">
                 <h2 id="results-title" class="text-2xl font-bold">Set Results</h2>
                 <button id="back-from-results-button" class="text-sm bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300 transition-colors duration-300">
                     &larr; Back to Menu
@@ -211,6 +211,7 @@
         const backToSelectionButton = document.getElementById('back-to-selection-button');
 
         const resultsGrid = document.getElementById('results-grid');
+        const resultsTitle = document.getElementById('results-title');
         const backFromResultsButton = document.getElementById('back-from-results-button');
         
         const statsContent = document.getElementById('stats-content');
@@ -454,42 +455,78 @@
                  statsContent.innerHTML += '<p class="text-slate-500 mt-4">No troublesome items yet. Keep practicing!</p>';
             }
         }
-
+        
         /**
-         * Displays the results for the just-completed set using session data.
+         * Displays the results for the just-completed set, focusing on incorrect items.
          */
         function displaySetResults() {
             showScreen('results-screen');
             resultsGrid.innerHTML = '';
-            
-            lastCompletedDeck.sort((a, b) => {
-                const statsA = sessionStats[a.item] || { incorrect: 0 };
-                const statsB = sessionStats[b.item] || { incorrect: 0 };
-                if (statsA.incorrect !== statsB.incorrect) {
-                    return statsB.incorrect - statsA.incorrect;
-                }
-                return a.item.localeCompare(b.item);
+
+            const existingSummary = resultsScreen.querySelector('#results-summary-container');
+            if (existingSummary) {
+                existingSummary.remove();
+            }
+
+            let totalSessionCorrect = 0;
+            let totalSessionIncorrect = 0;
+            Object.values(sessionStats).forEach(stat => {
+                totalSessionCorrect += stat.correct;
+                totalSessionIncorrect += stat.incorrect;
             });
 
-            lastCompletedDeck.forEach(item => {
-                const stats = sessionStats[item.item] || { correct: 0, incorrect: 0 };
-                const performanceColor = stats.incorrect > 0 ? 'text-red-600' : 'text-green-600';
-                
-                const resultCard = `
-                    <div class="flex items-center justify-between bg-slate-50 p-3 rounded-lg">
-                        <div>
-                            <div class="kanji-font text-xl">${item.item}</div>
-                            <div class="text-sm text-slate-500">${item.meaning.join(' / ')}</div>
-                            <div class="text-xs text-slate-400">${item.reading.join(' / ')}</div>
-                        </div>
-                        <div class="text-sm text-right font-semibold whitespace-nowrap pl-4">
-                            <span class="text-green-600">${stats.correct} Correct</span> / 
-                            <span class="${performanceColor}">${stats.incorrect} Incorrect</span>
-                        </div>
+            const totalSessionAttempts = totalSessionCorrect + totalSessionIncorrect;
+            const sessionAccuracy = totalSessionAttempts > 0 ? ((totalSessionCorrect / totalSessionAttempts) * 100).toFixed(1) : 100;
+            
+            const summaryContainer = document.createElement('div');
+            summaryContainer.id = 'results-summary-container';
+            summaryContainer.className = 'mb-6 p-4 bg-slate-100 rounded-lg text-center';
+            summaryContainer.innerHTML = `
+                <p class="text-xl font-bold">Session Accuracy: <span class="text-teal-600">${sessionAccuracy}%</span></p>
+                <p class="text-sm text-slate-500">${totalSessionCorrect} correct / ${totalSessionIncorrect} incorrect</p>
+            `;
+            resultsTitle.parentElement.insertAdjacentElement('afterend', summaryContainer);
+
+            const incorrectItems = lastCompletedDeck.filter(item => {
+                const stats = sessionStats[item.item];
+                return stats && stats.incorrect > 0;
+            });
+
+            incorrectItems.sort((a, b) => {
+                const statsA = sessionStats[a.item] || { incorrect: 0 };
+                const statsB = sessionStats[b.item] || { incorrect: 0 };
+                return statsB.incorrect - statsA.incorrect;
+            });
+
+            if (incorrectItems.length === 0) {
+                resultsTitle.textContent = 'Perfect Set Results!';
+                resultsGrid.innerHTML = `
+                    <div class="text-center p-8 bg-green-50 rounded-lg border border-green-200">
+                        <div class="text-6xl mb-4">🎉</div>
+                        <h3 class="text-2xl font-bold text-green-700">Perfect Set!</h3>
+                        <p class="text-slate-600 mt-2">You answered every item correctly on the first attempt. Well done!</p>
                     </div>
                 `;
-                resultsGrid.innerHTML += resultCard;
-            });
+            } else {
+                resultsTitle.textContent = 'Items to Review';
+                incorrectItems.forEach(item => {
+                    const stats = sessionStats[item.item] || { correct: 0, incorrect: 0 };
+                    const resultCard = `
+                        <div class="flex items-center justify-between bg-slate-50 p-3 rounded-lg">
+                            <div>
+                                <div class="kanji-font text-xl">${item.item}</div>
+                                <div class="text-sm text-slate-500">${item.meaning.join(' / ')}</div>
+                                <div class="text-xs text-slate-400">${item.reading.join(' / ')}</div>
+                            </div>
+                            <div class="text-sm text-right font-semibold whitespace-nowrap pl-4">
+                                <span class="text-green-600">${stats.correct} Correct</span> / 
+                                <span class="text-red-600">${stats.incorrect} Incorrect</span>
+                            </div>
+                        </div>
+                    `;
+                    resultsGrid.innerHTML += resultCard;
+                });
+            }
         }
         
         /**
